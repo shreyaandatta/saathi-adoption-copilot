@@ -1,0 +1,31 @@
+[
+  {
+    "code": "FD",
+    "name": "Fixed Deposit",
+    "category": "deposit",
+    "annual_rate": 0.068,
+    "min_amount": 10000,
+    "default_tenure_years": 2,
+    "eligibility": { "min_savings_balance": 25000 },
+    "one_liner": "Lock idle savings for a fixed term and earn more than a savings account."
+  },
+  {
+    "code": "SIP",
+    "name": "Systematic Investment Plan",
+    "category": "investment",
+    "assumed_return": 0.10,
+    "min_amount": 500,
+    "default_tenure_years": 5,
+    "eligibility": { "min_monthly_surplus": 1000, "min_age": 18, "max_age": 60 },
+    "one_liner": "Invest a small fixed amount every month and let it grow over time."
+  },
+  {
+    "code": "TERM",
+    "name": "Term Insurance",
+    "category": "insurance",
+    "monthly_premium_per_lakh": 45,
+    "default_cover": 2500000,
+    "eligibility": { "min_age": 18, "max_age": 55, "requires_no_existing_term": true },
+    "one_liner": "Low-cost cover that protects your family's income if something happens to you."
+  }
+]

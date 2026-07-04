@@ -1,0 +1,38 @@
+[
+  {
+    "id": "C001",
+    "name": "Ramesh Kumar",
+    "language": "hi",
+    "age": 41,
+    "occupation": "Kirana shopkeeper",
+    "savings_balance": 42000,
+    "avg_monthly_surplus": 3500,
+    "has_salary_credit": false,
+    "holdings": ["savings", "upi"],
+    "has_term_insurance": false
+  },
+  {
+    "id": "C002",
+    "name": "Priya Nair",
+    "language": "en",
+    "age": 29,
+    "occupation": "Salaried, IT services",
+    "savings_balance": 18000,
+    "avg_monthly_surplus": 9000,
+    "has_salary_credit": true,
+    "holdings": ["savings", "upi", "debit_card"],
+    "has_term_insurance": false
+  },
+  {
+    "id": "C003",
+    "name": "Anil Verma",
+    "language": "hi",
+    "age": 52,
+    "occupation": "Farmer",
+    "savings_balance": 8000,
+    "avg_monthly_surplus": 1200,
+    "has_salary_credit": false,
+    "holdings": ["savings"],
+    "has_term_insurance": true
+  }
+]
