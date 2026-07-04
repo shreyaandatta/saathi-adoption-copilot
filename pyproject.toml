@@ -1,0 +1,15 @@
+[project]
+name = "saathi"
+version = "0.1.0"
+description = "Saathi — agentic adoption copilot prototype"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110",
+    "pydantic>=2.6",
+    # Optional: only used when ANTHROPIC_API_KEY is set (Claude re-voicing layer)
+    "anthropic>=0.39",
+]
+
+# Tells Vercel where the FastAPI app instance lives.
+[tool.vercel]
+entrypoint = "backend.app:app"

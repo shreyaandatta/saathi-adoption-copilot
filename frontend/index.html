@@ -78,6 +78,13 @@
 const chat = document.getElementById('chat');
 const custSel = document.getElementById('cust');
 let CID = null;
+let pending = null;       // which suggestion we're awaiting a "yes" on
+let lastAction = null;    // the staged action awaiting consent
+let auditLog = [];        // built client-side (backend is stateless)
+
+function logEvent(action, detail){
+  auditLog.push({ ts: new Date().toISOString().replace('.000',''), action, detail });
+}
 
 function bubble(text, cls){
   const d = document.createElement('div');
@@ -95,6 +102,7 @@ async function loadCustomers(){
 
 async function pickCustomer(){
   CID = custSel.value;
+  pending = null; lastAction = null; auditLog = [];
   chat.innerHTML = '';
   const c = await (await fetch('/api/customer/'+CID)).json();
   document.getElementById('ctx').textContent =
@@ -110,12 +118,18 @@ async function send(){
   if(!text) return;
   box.value = '';
   bubble(text, 'user');
+  logEvent('message_in', text);
   const res = await (await fetch('/api/chat', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({customer_id: CID, message: text})
+    body: JSON.stringify({customer_id: CID, message: text, pending})
   })).json();
+  pending = res.pending || null;
   bubble(res.reply, 'bot');
-  if(res.proposal) consentCard(res.proposal);
+  if(res.proposal){
+    lastAction = res.proposal;
+    logEvent('action_staged', res.proposal.id + ' ' + res.proposal.summary);
+    consentCard(res.proposal);
+  }
 }
 
 function consentCard(a){
@@ -134,23 +148,25 @@ function consentCard(a){
     const otp = d.querySelector('#otp').value;
     const r = await (await fetch('/api/confirm', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({customer_id: CID, otp})
+      body: JSON.stringify({customer_id: CID, otp, action: lastAction})
     })).json();
     if(r.ok){
       d.remove();
+      logEvent('action_executed', lastAction.id + ' ref ' + r.reference);
+      lastAction = null;
       const done = document.createElement('div');
       done.className = 'done'; done.textContent = '✓ ' + r.message;
       chat.appendChild(done); chat.scrollTop = chat.scrollHeight;
     } else {
+      logEvent('consent_failed', lastAction ? lastAction.id : '');
       bubble(r.message, 'bot');
     }
   };
 }
 
-async function showAudit(){
-  const log = await (await fetch('/api/audit/'+CID)).json();
-  if(!log.length){ bubble('No actions logged yet for this customer.', 'bot'); return; }
-  bubble('Audit trail:\n' + log.map(e => `• ${e.ts} — ${e.action}: ${e.detail}`).join('\n'), 'bot');
+function showAudit(){
+  if(!auditLog.length){ bubble('No actions logged yet for this customer.', 'bot'); return; }
+  bubble('Audit trail:\n' + auditLog.map(e => `• ${e.ts} — ${e.action}: ${e.detail}`).join('\n'), 'bot');
 }
 
 loadCustomers();

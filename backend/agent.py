@@ -1,10 +1,14 @@
-"""The orchestrator.
+"""The orchestrator (stateless).
 
 Turns a customer message into a reply and, when appropriate, a staged action.
 It plans the conversation and translates jargon; it does not decide products
-(rules.py) or invent numbers (journey.py). Intent detection here is a small
-keyword parser so the demo runs offline; the natural-language re-voicing is
-handled by the optional Claude layer in llm.py.
+(rules.py) or invent numbers (journey.py).
+
+State handling: the tiny bit of conversation state — which suggestion is
+"pending" a yes/no — is passed in and returned, so the caller (the client) owns
+it. This keeps the backend fully stateless and safe on serverless platforms.
+Intent detection is a small keyword parser so the demo runs offline; the
+natural-language re-voicing is the optional Claude layer in llm.py.
 """
 
 from __future__ import annotations
@@ -27,73 +31,62 @@ def _has(text: str, words: set[str]) -> bool:
     return any(w in text for w in words)
 
 
-def _explain_and_offer(store: Store, cid: str, customer: dict, product: dict) -> dict:
+def _explain_and_offer(customer: dict, product: dict) -> dict:
     """Explain a product with a grounded illustration and offer to set it up."""
     ill = journey.build_illustration(customer, product)
-    store.set_pending(cid, product["code"])
     base = (
         f"{product['one_liner']} {ill['illustration']} "
         f"Shall I set up your {ill['summary'].lower()}? Just say yes."
     )
-    return {"reply": llm.rephrase(base, customer["language"]), "proposal": None}
+    return {"reply": llm.rephrase(base, customer["language"]),
+            "proposal": None, "pending": product["code"]}
 
 
-def handle(store: Store, cid: str, message: str) -> dict:
+def handle(store: Store, cid: str, message: str, pending: str | None = None) -> dict:
     customer = store.customer(cid)
     text = message.lower().strip()
-    session = store.session(cid)
-    store.log(cid, "message_in", message)
 
     # 1) The customer is confirming a suggestion we already made.
-    if _has(text, CONFIRM) and session.get("pending"):
-        product = store.product(session["pending"])
+    if _has(text, CONFIRM) and pending:
+        product = store.product(pending)
         action = journey.stage_action(customer, product)
-        store.stage(cid, action)
-        store.log(cid, "action_staged", f"{action['id']} {action['summary']}")
         reply = ("Great. Here's exactly what will happen — please confirm with your "
                  "OTP to go ahead. Nothing moves until you do.")
-        return {"reply": llm.rephrase(reply, customer["language"]), "proposal": action}
+        return {"reply": llm.rephrase(reply, customer["language"]),
+                "proposal": action, "pending": None}
 
     # 2) Balance question.
     if _has(text, BALANCE):
         bal = journey.rupees(customer["savings_balance"])
         return {"reply": llm.rephrase(f"Your savings balance is {bal}.", customer["language"]),
-                "proposal": None}
+                "proposal": None, "pending": None}
 
     # 3) A specific product the customer asked about.
     for words, code in ((FD_WORDS, "FD"), (SIP_WORDS, "SIP"), (INS_WORDS, "TERM")):
         if _has(text, words):
             product = store.product(code)
             if product and rules.is_eligible(customer, product):
-                return _explain_and_offer(store, cid, customer, product)
+                return _explain_and_offer(customer, product)
             return {"reply": llm.rephrase(
                 f"You're not eligible for {product['name'] if product else 'that'} right now, "
                 "but I can suggest something that fits you. Want to see?",
-                customer["language"]), "proposal": None}
+                customer["language"]), "proposal": None, "pending": None}
 
     # 4) Open exploration → next best action from the rules engine.
     if _has(text, EXPLORE):
         product = rules.next_best_action(customer, store.products)
         if product:
-            return _explain_and_offer(store, cid, customer, product)
+            return _explain_and_offer(customer, product)
 
     # 5) Greeting / fallback.
-    if _has(text, GREET) or True:
-        name = customer["name"].split()[0]
-        hint = "You can ask me what to do with idle money, or about an FD, SIP or insurance."
-        return {"reply": llm.rephrase(f"Namaste {name}! {hint}", customer["language"]),
-                "proposal": None}
+    name = customer["name"].split()[0]
+    hint = "You can ask me what to do with idle money, or about an FD, SIP or insurance."
+    return {"reply": llm.rephrase(f"Namaste {name}! {hint}", customer["language"]),
+            "proposal": None, "pending": None}
 
 
-def confirm(store: Store, cid: str, otp: str) -> dict:
-    session = store.session(cid)
-    action = session.get("staged")
+def confirm(action: dict | None, otp: str) -> dict:
+    """Execute a staged action (passed back by the client) once the OTP matches."""
     if not action:
         return {"ok": False, "message": "There's nothing waiting to be confirmed."}
-    result = journey.execute(action, otp)
-    if result["ok"]:
-        store.log(cid, "action_executed", f"{action['id']} ref {result['reference']}")
-        store.clear_session(cid)
-    else:
-        store.log(cid, "consent_failed", action["id"])
-    return result
+    return journey.execute(action, otp)

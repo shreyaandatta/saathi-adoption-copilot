@@ -1,7 +1,11 @@
 """FastAPI app: serves the chat UI and the Saathi API.
 
-Run:  uvicorn backend.app:app --reload
-Then open http://localhost:8000
+Local:   uvicorn backend.app:app --reload   → http://localhost:8000
+Vercel:  detected as a FastAPI app via pyproject.toml ([tool.vercel] entrypoint).
+
+The backend is stateless — the client carries the small conversation state
+(`pending`, and the staged `action`) and passes it back, so it runs identically
+on a single local process or on serverless functions.
 """
 
 from __future__ import annotations
@@ -24,11 +28,13 @@ FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 class ChatIn(BaseModel):
     customer_id: str
     message: str
+    pending: str | None = None
 
 
 class ConfirmIn(BaseModel):
     customer_id: str
     otp: str
+    action: dict | None = None
 
 
 @app.get("/")
@@ -56,16 +62,11 @@ def customer(cid: str) -> dict:
 @app.post("/api/chat")
 def chat(body: ChatIn) -> dict:
     try:
-        return agent.handle(store, body.customer_id, body.message)
+        return agent.handle(store, body.customer_id, body.message, body.pending)
     except KeyError:
         raise HTTPException(404, "unknown customer")
 
 
 @app.post("/api/confirm")
 def confirm(body: ConfirmIn) -> dict:
-    return agent.confirm(store, body.customer_id, body.otp)
-
-
-@app.get("/api/audit/{cid}")
-def audit(cid: str) -> list:
-    return store.audit_log(cid)
+    return agent.confirm(body.action, body.otp)
