@@ -4,6 +4,10 @@
 
 Built for **Global Fintech Fest 2026 · SBI Hackathon** — Pillar 02, *Digital Adoption*.
 
+### ▶ Live demo: **[saathi-adoption-copilot.vercel.app](https://saathi-adoption-copilot.vercel.app/)**
+
+Try it: pick **Ramesh Kumar** → type *"I have some money just sitting there, what can I do?"* → say **yes** → confirm with demo OTP **1234**.
+
 ---
 
 ## The problem
